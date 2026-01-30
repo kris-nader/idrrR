@@ -1,5 +1,5 @@
 
-# idrrR: Integrated Drug Response Resource Tools
+# idrrR: Integrated Drug Response Resource Tool
 
 `idrrR` is an R package designed to harmonize and analyze pharmacogenomic drug response data. It serves as the computational engine behind the **iDRR (Integrated Drug Response Resource)** project, enabling researchers to calculate robust consensus drug response curves and compare their own experimental data against a large-scale integrated database.
 
