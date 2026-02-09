@@ -5,7 +5,7 @@
 
 ## About the Project
 
-Pharmacogenomic datasets (such as GDSC, CTRP, and others) often show discordant results for the same drug-cell line pairs due to variations in experimental protocols, assay types, and analytical methods. **iDRR** addresses this inconsistency by integrating multiple datasets to derive a **"Consensus Curve"**—a unified, robust estimate of drug sensitivity that mitigates noise and outliers.
+Pharmacogenomic datasets (such as GDSC, CTRP, and others) often show discordant results for the same drug-cell line pairs due to variations in experimental protocols, assay types, and analytical methods. **iDRR** addresses this inconsistency by integrating multiple datasets to derive a **"Consensus Curve"**-a unified, robust estimate of drug sensitivity that mitigates noise and outliers.
 
 **Key Features:**
 *   **Consensus Modeling:** fits a 4-parameter logistic (4-PL) curve to integrated data from multiple studies.
