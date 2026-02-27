@@ -9,8 +9,7 @@ Pharmacogenomic datasets (such as GDSC, CTRP, and others) often show discordant 
 
 **Key Features:**
 *   **Consensus Modeling:** fits a 4-parameter logistic (4-PL) curve to integrated data from multiple studies.
-*   **Comprehensive Metrics:** Calculates IC50, AUC, Slope, Max Response, efficacy (ACT1/10/100), and advanced metrics like DSS (Drug Sensitivity Score) and its variants.
-*   **Advanced DRS Scoring:** Implements the novel Drug Response Score.
+*   **omprehensive Metrics:** Implements the novel Drug Response Score as well as Standard Error of Estimate (SEE).
 *   **Benchmarking:** Allows users to overlay their own data on consensus curves to quantify deviation (Standard Error of Estimate).
 
 
