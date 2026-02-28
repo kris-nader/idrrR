@@ -10,7 +10,7 @@ dss_library_all <- function(ic50, slope, max_response, min_conc, max_conc, resid
 
   # Basic validation
   if (is.na(ic50) || is.na(slope) || is.na(max_response)) {
-    return(data.frame(MSF4 = 0))
+    return(data.frame(DRS = 0))
   }
 
   # Handle infinite/very large absIC50 values
@@ -62,5 +62,5 @@ dss_library_all <- function(ic50, slope, max_response, min_conc, max_conc, resid
   if (drs_value < 0) drs_value <- 0
   drs_value <- round(drs_value, 4)
 
-  return(data.frame(MSF4 = drs_value))
+  return(data.frame(DRS = drs_value))
 }

@@ -8,7 +8,7 @@ plot_custom_on_consensus(
   drug_name,
   cell_line,
   dose,
-  viability,
+  inhibition,
   dataset_name = "User_Upload",
   background_alpha = 0.3
 )
@@ -20,7 +20,7 @@ plot_custom_on_consensus(
 
 \item{dose}{Numeric vector of custom doses.}
 
-\item{viability}{Numeric vector of custom viability. Accepts both 0-1 and 0-100 scales (auto-detected).}
+\item{inhibition}{Numeric vector of custom inhibition. Accepts both 0-1 and 0-100 scales (auto-detected).}
 
 \item{dataset_name}{Character string for the custom dataset label.}
 

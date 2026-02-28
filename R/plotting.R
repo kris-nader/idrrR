@@ -67,9 +67,9 @@ plot_consensus_curve <- function(dose, response, ic50, slope, max_response, data
         }
     }
 
-    # Dataset palette for consistency
+    # Dataset palette for consistency - ensuring distinct colors for all observed datasets
     dataset_pal <- c(
-        ASTRAZENICA = "#fb9a99",
+        ASTRAZENICA = "#e78ac3",
         CCLE = "#e31a1c",
         CTRPv2 = "#a6cee3",
         gCSI = "#1f78b4",
@@ -79,15 +79,13 @@ plot_consensus_curve <- function(dose, response, ic50, slope, max_response, data
         oneil = "#ff7f00",
         PRISM = "#cab2d6",
         NCI60 = "#6a3d9a",
-        FIMM = "#1f78b4",
-        BeatAML = "#b15928",
-        GBM2021 = "#ffff99",
-        UHNBreast = "#a6cee3",
-        GRAY = "#fb9a99",
-        jaaks = "#cab2d6",
+        FIMM = "#e7298a",
+        UHNBreast = "#1b9e77",
+        GRAY = "#d95f02",
+        Jaaks = "#7570b3",
+        gdsc2combi = "#a6761d",
         Consensus = "#333333",
-        User_Upload = "#333333",
-        Unknown = "#999999"
+        User_Upload = "#333333"
     )
 
     p <- ggplot2::ggplot() +

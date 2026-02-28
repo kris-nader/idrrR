@@ -251,102 +251,6 @@ calculate_all <- function(dose, inhibition_percent, dataset, drug_name, DSS_type
   auc <- MESS::auc(x, yic)
 
 
-  # Modify the calculate_AA and calculate_AAC functions to use the custom range
-  calculate_AA <- function(dose, inhibition_percent, min_dose = NULL, max_dose = NULL) {
-    # Sort data by dose
-    df <- data.frame(dose = dose, inhibition = inhibition_percent)
-    df <- df[order(df$dose), ]
-
-    # Filter by dose range if specified
-    if (!is.null(min_dose)) {
-      df <- df[df$dose >= min_dose, ]
-    }
-    if (!is.null(max_dose)) {
-      df <- df[df$dose <= max_dose, ]
-    }
-
-    # Calculate area using rectangle method
-    n <- length(df$dose)
-    if (n <= 1) {
-      return(0)
-    }
-
-    # Convert doses to log scale (as shown in the paper)
-    log_doses <- log10(df$dose)
-
-    # Calculate width of each rectangle in log space
-    widths <- diff(log_doses)
-
-    # Calculate sum of areas (rectangle method as described in the paper)
-    aa <- sum(df$inhibition[-1] * widths) # Using inhibition values as heights
-
-    return(aa)
-  }
-  AA <- calculate_AA(mat_tbl$dose, mat_tbl$inhibition_percent, min_dose = min_dose_range, max_dose = max_dose_range)
-
-
-  # Similarly update the AAC calculation
-  calculate_AAC <- function(concentrations, responses, min_dose = NULL, max_dose = NULL) {
-    # Filter by dose range if specified
-    if (!is.null(min_dose) || !is.null(max_dose)) {
-      indices <- rep(TRUE, length(concentrations))
-      if (!is.null(min_dose)) {
-        indices <- indices & (concentrations >= min_dose)
-      }
-      if (!is.null(max_dose)) {
-        indices <- indices & (concentrations <= max_dose)
-      }
-      concentrations <- concentrations[indices]
-      responses <- responses[indices]
-    }
-
-    # Integrate response curve over log concentration
-    log_conc <- log10(concentrations)
-    # Area calculation with trapezoidal rule
-    areas <- 0
-    for (i in 2:length(log_conc)) {
-      areas <- areas + (log_conc[i] - log_conc[i - 1]) *
-        (responses[i] + responses[i - 1]) / 2
-    }
-    return(areas / (log_conc[length(log_conc)] - log_conc[1]))
-  }
-  AAC <- calculate_AAC(mat_tbl$dose, mat_tbl$inhibition_percent, min_dose = min_dose_range, max_dose = max_dose_range)
-  if (length(AAC) == 0) {
-    AAC <- 0
-  }
-
-
-  # OAUC - Outlier-Adjusted AUC
-  OAUC <- function(auc, residuals, threshold = 2) {
-    # Penalize AUC based on presence of outliers
-    outlier_penalty <- sum(abs(residuals) > (threshold * sd(residuals))) / length(residuals)
-    return(auc * (1 - outlier_penalty))
-  }
-  auc2 <- OAUC(auc, mat_tbl$residuals)
-
-  ## average replicates
-  mat_tblCp <- mat_tbl[, c("inhibition_percent", "dose")]
-  cols_ <- colnames(mat_tblCp)[!grepl("inhibition_percent", colnames(mat_tblCp))] # columns which should be equal to average PI
-  X <- as.data.table(mat_tblCp)
-  mat_tblCp <- as.data.frame(X[, list(inhibition_percent = mean(inhibition_percent)), cols_], stringAsFactors = !1)
-
-
-  perInh <- t(matrix(mat_tblCp[, "inhibition_percent"],
-    dimnames =
-      list(paste0(rep("D", length(mat_tblCp[, "inhibition_percent"])), 1:length(mat_tblCp[, "inhibition_percent"])))
-  ))
-
-  coef_tec50 <- coef_ic50
-  coef_tec50["IC50"] <- ifelse(coef_tec50["MAX"] > 25, coef_tec50["IC50"], max(mat_tbl$dose, na.rm = T))
-  names(coef_tec50) <- c("EC50", "SLOPE", "MAX", "MIN")
-  coef_tec50["SLOPE"] <- -1 * coef_tec50["SLOPE"] # min - 0, max - 77 in ec50 it is max - 100, min - 23
-  tmp <- coef_tec50["MAX"]
-  coef_tec50["MAX"] <- 100 - coef_tec50["MIN"]
-  coef_tec50["MIN"] <- 100 - tmp
-  ytec <- 100 - yic
-  perViaTox <- 100 - perInh
-
-
   ####
   # Absolute IC50
   xIC50ABS <- seq(min(mat_tbl$logconc), max(mat_tbl$logconc) * 15, length = 5000)
@@ -355,106 +259,104 @@ calculate_all <- function(dose, inhibition_percent, dataset, drug_name, DSS_type
   ####
 
 
-  # Absolute IC20
-  if (all(yicIC50ABS < 10)) coef_ic10ABS <- Inf else coef_ic10ABS <- 10**xIC50ABS[which.min(abs(yicIC50ABS - 10))]
-  ####
-
-  # Absolute IC20
-  if (all(yicIC50ABS < 20)) coef_ic20ABS <- Inf else coef_ic20ABS <- 10**xIC50ABS[which.min(abs(yicIC50ABS - 20))]
-  ####
-
-  ##  Decay parameter - related to how quickly response decays with concentration
-  Decay <- (coef_ic50["SLOPE"] * (coef_ic50["MAX"] / 100))[[1]]
-
-
-  # Potency Interval (PI)
-  # Range between ic20 and IC10 - shows steepness of dose-response
-  PI <- function(ic20, ic10) {
-    return(log10(ic20 / ic10))
-  }
-
-  # Measures inequality in drug response across cell lines
-  Gini <- function(responses) {
-    responses <- sort(responses)
-    n <- length(responses)
-    index <- 1:n
-    return((2 * sum(index * responses) / (n * sum(responses))) - (n + 1) / n)
-  }
-
-  activity_at_conc <- function(nls_model, conc) {
-    predict(nls_model, data.frame(logconc = log10(conc)))
-  }
-
-  ACT1 <- activity_at_conc(nls_result_ic50, 1)
-  ACT10 <- activity_at_conc(nls_result_ic50, 10)
-  ACT100 <- activity_at_conc(nls_result_ic50, 100)
-
-  hill_coefficient <- abs(coef_ic50["IC50"]) * log(10)
-
   #############################
   #############    DSS
-
-  # Calculate specific DSS variants requested by user
-  dss_score1 <- round(as.numeric(dss(coef_ic50["IC50"], coef_ic50["SLOPE"], coef_ic50["MAX"], min_signal, max_signal, DSS.type = as.integer(1), y = 10, min_dose_range = min_dose_range, max_dose_range = max_dose_range)), 2)
-  dss_score2 <- round(as.numeric(dss(coef_ic50["IC50"], coef_ic50["SLOPE"], coef_ic50["MAX"], min_signal, max_signal, DSS.type = as.integer(2), y = 10, min_dose_range = min_dose_range, max_dose_range = max_dose_range)), 2)
-  dss_score3 <- round(as.numeric(dss(coef_ic50["IC50"], coef_ic50["SLOPE"], coef_ic50["MAX"], min_signal, max_signal, DSS.type = as.integer(3), y = 10, min_dose_range = min_dose_range, max_dose_range = max_dose_range)), 2)
-  dss_score4 <- round(as.numeric(dss(coef_ic50["IC50"], coef_ic50["SLOPE"], coef_ic50["MAX"], min_signal, max_signal, DSS.type = as.integer(1), y = 5, min_dose_range = min_dose_range, max_dose_range = max_dose_range)), 2)
-  dss_score5 <- round(as.numeric(dss(coef_ic50["IC50"], coef_ic50["SLOPE"], coef_ic50["MAX"], min_signal, max_signal, DSS.type = as.integer(2), y = 5, min_dose_range = min_dose_range, max_dose_range = max_dose_range)), 2)
-  dss_score6 <- round(as.numeric(dss(coef_ic50["IC50"], coef_ic50["SLOPE"], coef_ic50["MAX"], min_signal, max_signal, DSS.type = as.integer(3), y = 5, min_dose_range = min_dose_range, max_dose_range = max_dose_range)), 2)
-  dss_score10 <- round(as.numeric(dss(coef_ic50["IC50"], coef_ic50["SLOPE"], coef_ic50["MAX"], min_signal, max_signal, DSS.type = as.integer(1), y = 15, min_dose_range = min_dose_range, max_dose_range = max_dose_range)), 2)
-  dss_score11 <- round(as.numeric(dss(coef_ic50["IC50"], coef_ic50["SLOPE"], coef_ic50["MAX"], min_signal, max_signal, DSS.type = as.integer(2), y = 15, min_dose_range = min_dose_range, max_dose_range = max_dose_range)), 2)
-  dss_score12 <- round(as.numeric(dss(coef_ic50["IC50"], coef_ic50["SLOPE"], coef_ic50["MAX"], min_signal, max_signal, DSS.type = as.integer(3), y = 15, min_dose_range = min_dose_range, max_dose_range = max_dose_range)), 2)
-
-  dss_scores_df <- data.frame(
-    DSS_Type1_y10 = dss_score1, DSS_Type2_y10 = dss_score2, DSS_Type3_y10 = dss_score3,
-    DSS_Type1_y5 = dss_score4, DSS_Type2_y5 = dss_score5, DSS_Type3_y5 = dss_score6,
-    DSS_Type1_y15 = dss_score10, DSS_Type2_y15 = dss_score11, DSS_Type3_y15 = dss_score12
-  )
-
   dss_more <- dss_library_all(as.numeric(coef_ic50["IC50"]), as.numeric(coef_ic50["SLOPE"]), as.numeric(coef_ic50["MAX"]),
     min_conc = min_signal, max_conc = max_signal, residuals = mat_tbl$residuals,
     nls_model = nls_result_ic50, observed_values = mat_tbl$inhibition_percent, ic50_abs = coef_ic50ABS, min_dose_range = min_dose_range, max_dose_range = max_dose_range
   )
 
-
   # dataframe for IC50
   IC50_dataframe <- data.frame(
-    DRUG_NAME = drug_name, ANALYSIS_NAME = "IC50", IC50ABS = coef_ic50ABS, t(as.matrix(coef_ic50)),
-    SE_of_estimate = as.numeric(ic50std_resid), AUC = auc, IC10ABS = coef_ic10ABS, IC20ABS = coef_ic20ABS
+    DRUG_NAME = drug_name,
+    IC50ABS = coef_ic50ABS,
+    IC50 = coef_ic50["IC50"],
+    SLOPE = coef_ic50["SLOPE"],
+    Max_Response = coef_ic50["MAX"],
+    SE_of_estimate = as.numeric(ic50std_resid),
+    DRS = dss_more$DRS
   )
-
-  # Include MSF4 and DSS variants
-  IC50_dataframe$MSF4 <- dss_more$MSF4
-  IC50_dataframe <- cbind(IC50_dataframe, dss_scores_df)
-
-  IC50_dataframe$ACT1 <- ACT1
-  IC50_dataframe$ACT10 <- ACT10
-  IC50_dataframe$ACT100 <- ACT100
-  IC50_dataframe$AA <- AA
-  IC50_dataframe$AAC <- AAC
-  IC50_dataframe$OAUC <- auc2
-  IC50_dataframe$Decay <- Decay
-  IC50_dataframe$pIC50 <- -log10(IC50_dataframe$IC50)
-  IC50_dataframe$pIC50ABS <- -log10(IC50_dataframe$IC50ABS)
-  IC50_dataframe$pIC20ABS <- -log10(IC50_dataframe$IC20ABS)
-  IC50_dataframe$pIC10ABS <- -log10(IC50_dataframe$IC10ABS)
-  IC50_dataframe$PI <- PI(IC50_dataframe$pIC20ABS, IC50_dataframe$pIC10ABS)
-  IC50_dataframe$Gini <- Gini(mat_tbl$inhibition_percent)
-  IC50_dataframe$Hill <- hill_coefficient
-
-  # Compatibility columns for wrappers.R
-  IC50_dataframe$IC50_absolute <- IC50_dataframe$IC50
-  IC50_dataframe$Slope <- IC50_dataframe$SLOPE
-  IC50_dataframe$Max_Response <- IC50_dataframe$MAX
 
 
   #  #round by 2 dex. all the numeric colums
   numeric_cols <- sapply(IC50_dataframe, is.numeric)
   IC50_dataframe[, numeric_cols] <- round(IC50_dataframe[, numeric_cols], 2)
   #
-  #  # plot IC50
-  #  #mat_tbl$inhibition_percent = xpr_tbl$inhibition_percent_percent[idx_filt]; # if we have all values < 0, they will be replaced
-  #  #mat_tbl$viability = 100 - mat_tbl$inhibition_percent;  # we are replacing them back here.
+  # plot IC50
+  # mat_tbl$inhibition_percent = xpr_tbl$inhibition_percent_percent[idx_filt]; # if we have all values < 0, they will be replaced
+  # mat_tbl$viability = 100 - mat_tbl$inhibition_percent;  # we are replacing them back here.
+
+  # Modified function that uses the existing fitted logistic curve values
+  create_nature_style_plot <- function(x, y_fitted, ic50_value, data_points, d_name, d_score) {
+    df <- data.frame(x = x, y = y_fitted)
+    df <- df[order(df$x), ]
+    width_factor <- 0.07
+    upper <- y_fitted + (max(y_fitted) - min(y_fitted)) * width_factor
+    lower <- y_fitted - (max(y_fitted) - min(y_fitted)) * width_factor
+    curve_data <- data.frame(
+      x = x, y = y_fitted, upper = upper, lower = lower,
+      pos = seq(0, 1, length.out = length(x))
+    )
+    ic50_x <- log10(ic50_value)
+
+    p <- ggplot2::ggplot() +
+      ggplot2::theme_minimal() +
+      ggplot2::geom_ribbon(data = curve_data, ggplot2::aes(x = x, ymin = lower, ymax = upper), fill = "#3A8BC9", alpha = 0.15) +
+      ggplot2::geom_line(data = curve_data, ggplot2::aes(x = x, y = upper), color = "#3A8BC9", linewidth = 0.5, alpha = 0.6) +
+      ggplot2::geom_line(data = curve_data, ggplot2::aes(x = x, y = lower), color = "#3A8BC9", linewidth = 0.5, alpha = 0.6) +
+      ggplot2::geom_line(data = curve_data, ggplot2::aes(x = x, y = y, color = pos), linewidth = 1.4) +
+      ggplot2::scale_color_gradientn(colors = c("#4A90E2", "#E74C3C"), guide = "none") +
+      ggplot2::geom_vline(xintercept = ic50_x, color = "grey40", linewidth = 0.6, linetype = "dashed") +
+      ggplot2::geom_hline(yintercept = 50, linetype = "dotted", color = "grey60", linewidth = 0.4) +
+      ggplot2::geom_point(data = data_points, ggplot2::aes(x = logconc, y = inhibition_percent, fill = dataset), size = 2, shape = 21, color = "black", stroke = 0.4) +
+      ggplot2::scale_fill_manual(
+        values = c("#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00", "#cab2d6", "#6a3d9a", "#ffff99", "#b15928"),
+        name = "Dataset"
+      ) +
+      ggplot2::scale_x_continuous(breaks = log10(c(1, 10, 100, 1000, 10000)), labels = c("1", "10", "10²", "10³", "10⁴"), minor_breaks = NULL, name = "Dose (nM)", expand = c(0.02, 0)) +
+      ggplot2::scale_y_continuous(breaks = seq(0, 100, by = 25), limits = c(-25, 125), name = "Response (%)", expand = c(0.02, 0)) +
+      ggplot2::ggtitle(paste0(d_name, " (DRS: ", d_score, ")")) +
+      ggplot2::theme(
+        panel.grid.major.y = ggplot2::element_line(color = "grey95", linewidth = 0.3),
+        panel.grid.major.x = ggplot2::element_blank(),
+        panel.grid.minor = ggplot2::element_blank(),
+        plot.background = ggplot2::element_rect(fill = "white", colour = NA),
+        panel.background = ggplot2::element_rect(fill = "white", colour = NA),
+        panel.border = ggplot2::element_rect(color = "black", fill = NA, linewidth = 0.5),
+        plot.title = ggplot2::element_text(hjust = 0.5, size = 12, face = "bold"),
+        axis.title = ggplot2::element_text(size = 10, face = "bold"),
+        axis.title.x = ggplot2::element_text(margin = ggplot2::margin(t = 10)),
+        axis.title.y = ggplot2::element_text(margin = ggplot2::margin(r = 10)),
+        axis.text = ggplot2::element_text(size = 9, color = "black"),
+        legend.position = c(0.9, 0.25),
+        legend.background = ggplot2::element_rect(fill = NA, color = NA),
+        legend.key = ggplot2::element_rect(fill = NA),
+        legend.title = ggplot2::element_text(face = "bold", size = 9),
+        legend.text = ggplot2::element_text(size = 8),
+        legend.key.size = ggplot2::unit(0.8, "lines"),
+        plot.margin = ggplot2::margin(10, 10, 10, 10)
+      )
+    return(p)
+  }
+
+  nature_plot <- create_nature_style_plot(
+    x = x,
+    y_fitted = yic,
+    ic50_value = coef_ic50["IC50"],
+    data_points = mat_tbl,
+    d_name = drug_name,
+    d_score = IC50_dataframe$DRS[1]
+  )
+
+  grDevices::pdf(paste0("./", drug_name, "_nature_style_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".pdf"), width = 3.5, height = 2.8)
+  print(nature_plot)
+  grDevices::dev.off()
+
+  grDevices::png(paste0("./", drug_name, "_nature_style_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png"), width = 5, height = 4.5, units = "in", res = 600, bg = "white")
+  print(nature_plot)
+  grDevices::dev.off()
+
+  print(nature_plot)
 
 
   return(IC50_dataframe)

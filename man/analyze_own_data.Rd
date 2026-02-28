@@ -7,7 +7,7 @@
 analyze_own_data(data, plot = TRUE)
 }
 \arguments{
-\item{data}{Data frame containing columns: Drug_Name, Cell_Line, Dose, Viability.}
+\item{data}{Data frame containing columns: Drug_Name, Cell_Line, Dose, Inhibition.}
 
 \item{plot}{Logical, whether to generate plots.}
 }

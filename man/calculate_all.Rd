@@ -2,7 +2,7 @@
 % Please edit documentation in R/metrics.R
 \name{calculate_all}
 \alias{calculate_all}
-\title{Calculate Dose-Response Metrics}
+\title{Calculate All Metrics}
 \usage{
 calculate_all(
   dose,
@@ -15,20 +15,20 @@ calculate_all(
 )
 }
 \arguments{
-\item{dose}{Numeric vector of doses/concentrations.}
+\item{dose}{Numeric vector of doses}
 
-\item{inhibition_percent}{Numeric vector of inhibition percentages.}
+\item{inhibition_percent}{Numeric vector of inhibition}
 
-\item{dataset}{Character string naming the dataset.}
+\item{dataset}{Dataset name}
 
-\item{drug_name}{Character string naming the drug.}
+\item{drug_name}{Drug name}
 
-\item{DSS_type}{Integer type of DSS calculation (1, 2, or 3).}
+\item{DSS_type}{DSS type (default 2)}
 
-\item{min_dose_range}{Optional numeric min dose.}
+\item{min_dose_range}{Optional min dose}
 
-\item{max_dose_range}{Optional numeric max dose.}
+\item{max_dose_range}{Optional max dose}
 }
 \description{
-Estimates IC50, slope, and other parameters for dose-response data using non-linear least squares.
+Calculate All Metrics
 }

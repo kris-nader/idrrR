@@ -117,47 +117,54 @@ get_metrics <- function(drug, cell_line, dose, inhibition) {
 #' @import data.table
 #' @export
 plot_consensus_from_db <- function(drug_name, cell_line) {
-    # 1. Access Cache (Data loaded at startup by .onLoad in zzz.R)
-    cached_db <- .idrr_env$consensus_data
-
-    if (is.null(cached_db)) {
-        # Fallback specifically for development/testing if .onLoad didn't trigger
-        # But generally we expect it to be there.
-        # We can try to load it manually here to be robust, but user asked for "at library load"
-        stop("Consensus data is not loaded. Please try reloading the package: detach('package:idrrR', unload=TRUE); library(idrrR)")
-    }
+    # 1. Access Cache (Loaded on first query by get_consensus_data in zzz.R)
+    cached_db <- get_consensus_data()
 
     # 2. Fast Lookup
     # Standardize input
-    norm <- function(x) gsub("-", "", toupper(x))
+    norm <- function(x) gsub("[^[:alnum:]]", "", toupper(x))
     target_drug <- norm(drug_name)
     target_cell <- norm(cell_line)
 
-    # Use data.table keyed subsetting: DT[.(key1, key2)]
-    # This is O(log n) compared to vector scan
-    db_subset <- cached_db[list(target_drug, target_cell), nomatch = 0]
+    # Use explicit vector subsetting since keys may not be formally set to clean_drug/clean_cell
+    # This maintains data.table speed while avoiding key mapping errors
+    db_subset <- cached_db[grepl(target_drug, clean_drug) & clean_cell == target_cell]
 
     if (nrow(db_subset) == 0) {
         stop("No data found for Drug: ", drug_name, " and Cell Line: ", cell_line)
     }
 
-    # 3. Proceed with Calculation
-    inhibition <- 100 - db_subset$viability
-    doses <- db_subset$dose
-    datasets <- db_subset$dataset
+    unique_dd <- unique(db_subset$DD)
+    if (length(unique_dd) > 1) {
+        stop("Search matched multiple unique drugs (", paste(unique_dd, collapse = ", "), "). Please refine your search query for greater specificity.")
+    }
 
-    metrics <- calculate_all(
-        dose = doses,
-        inhibition_percent = inhibition,
-        dataset = "Consensus",
-        drug_name = drug_name
+    # 3. Proceed with Calculation
+    # First, summarize technical replicates by taking the median viability per dose & dataset
+    dr_data <- db_subset
+    if (!data.table::is.data.table(dr_data)) data.table::setDT(dr_data)
+
+    # User requested data.table grouping specifically:
+    med_data_og <- dr_data[, .(med_viability = median(viability, na.rm = TRUE)), by = .(DD, dataset, dose)]
+    med_data_og_sorted <- med_data_og[order(dataset, dose)]
+
+    b <- calculate_all(
+        dose = med_data_og_sorted$dose,
+        inhibition_percent = 100 - med_data_og_sorted$med_viability,
+        dataset = med_data_og_sorted$dataset,
+        drug_name = med_data_og_sorted$DD[1]
     )
+
+    metrics <- b
+    doses <- med_data_og_sorted$dose
+    inhibition <- 100 - med_data_og_sorted$med_viability
+    datasets <- med_data_og_sorted$dataset
 
     p <- plot_consensus_curve(
         dose = doses,
         response = inhibition,
-        ic50 = metrics$IC50_absolute,
-        slope = metrics$Slope,
+        ic50 = metrics$IC50,
+        slope = metrics$SLOPE,
         max_response = metrics$Max_Response,
         dataset = datasets,
         title = paste("Consensus:", drug_name, "x", cell_line)
@@ -168,7 +175,7 @@ plot_consensus_from_db <- function(drug_name, cell_line) {
         metrics = metrics,
         cell_line = cell_line,
         drug_name = drug_name,
-        n_points = nrow(db_subset)
+        n_points = nrow(med_data_og_sorted) # Now returns the number of summarized points
     ))
 }
 
@@ -188,17 +195,19 @@ plot_consensus_from_db <- function(drug_name, cell_line) {
 #' @export
 plot_custom_on_consensus <- function(drug_name, cell_line, dose, inhibition, dataset_name = "User_Upload", background_alpha = 0.3) {
     # 1. Access Cache
-    cached_db <- .idrr_env$consensus_data
-    if (is.null(cached_db)) {
-        stop("Consensus data is not loaded. Please ensure library(idrrR) was loaded successfully.")
-    }
+    cached_db <- get_consensus_data()
 
     # 2. Get Database Data
-    norm <- function(x) gsub("-", "", toupper(x))
+    norm <- function(x) gsub("[^[:alnum:]]", "", toupper(x))
     target_drug <- norm(drug_name)
     target_cell <- norm(cell_line)
 
-    db_subset <- cached_db[list(target_drug, target_cell), nomatch = 0]
+    db_subset <- cached_db[grepl(target_drug, clean_drug) & clean_cell == target_cell]
+
+    unique_dd <- unique(db_subset$DD)
+    if (length(unique_dd) > 1) {
+        stop("Search matched multiple unique drugs (", paste(unique_dd, collapse = ", "), "). Please refine your search query for greater specificity.")
+    }
 
     # Handle case where DB has no data -> just plot custom
     if (nrow(db_subset) == 0) {
@@ -236,25 +245,35 @@ plot_custom_on_consensus <- function(drug_name, cell_line, dose, inhibition, dat
     final_alpha <- c(db_alpha, custom_alpha)
 
     # 4a. Calculate Combined Metrics (Consensus Fit)
+    combined_df <- data.frame(dose = final_dose, inhibition = final_inhib, dataset = final_dataset, DD = drug_name)
+    if (!data.table::is.data.table(combined_df)) data.table::setDT(combined_df)
+
+    agg_combined_df <- combined_df[, .(inhibition = median(inhibition, na.rm = TRUE)), by = .(DD, dataset, dose)]
+
     metrics_consensus <- calculate_all(
-        dose = final_dose,
-        inhibition_percent = final_inhib,
+        dose = agg_combined_df$dose,
+        inhibition_percent = agg_combined_df$inhibition,
         dataset = "Combined_Consensus",
         drug_name = drug_name
     )
 
     # 4b. Calculate Custom-Only Metrics (Gray Curve Fit)
+    custom_df <- data.frame(dose = dose, inhibition = custom_inhib, dataset = custom_datasets, DD = drug_name)
+    if (!data.table::is.data.table(custom_df)) data.table::setDT(custom_df)
+
+    agg_custom_df <- custom_df[, .(inhibition = median(inhibition, na.rm = TRUE)), by = .(DD, dataset, dose)]
+
     metrics_custom <- calculate_all(
-        dose = dose,
-        inhibition_percent = custom_inhib,
-        dataset = custom_datasets,
+        dose = agg_custom_df$dose,
+        inhibition_percent = agg_custom_df$inhibition,
+        dataset = custom_datasets[1], # Use a single label
         drug_name = drug_name
     )
 
     # 4c. Calculate Standard Error of Estimate (SEE) of Custom Points vs Consensus Curve
     # Consensus Parameters
-    ic50_cons <- metrics_consensus$IC50_absolute
-    slope_cons <- metrics_consensus$Slope
+    ic50_cons <- metrics_consensus$IC50
+    slope_cons <- metrics_consensus$SLOPE
     max_cons <- metrics_consensus$Max_Response
 
     # Predict values for custom points using Consensus Model
@@ -271,14 +290,14 @@ plot_custom_on_consensus <- function(drug_name, cell_line, dose, inhibition, dat
     p <- plot_consensus_curve(
         dose = final_dose,
         response = final_inhib,
-        ic50 = metrics_consensus$IC50_absolute,
-        slope = metrics_consensus$Slope,
+        ic50 = metrics_consensus$IC50,
+        slope = metrics_consensus$SLOPE,
         max_response = metrics_consensus$Max_Response,
         dataset = final_dataset,
         point_alpha = final_alpha,
         custom_fit = list(
-            ic50 = metrics_custom$IC50_absolute,
-            slope = metrics_custom$Slope,
+            ic50 = metrics_custom$IC50,
+            slope = metrics_custom$SLOPE,
             max = metrics_custom$Max_Response,
             dose_min = min(dose),
             dose_max = max(dose)

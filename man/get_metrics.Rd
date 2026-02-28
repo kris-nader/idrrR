@@ -4,7 +4,7 @@
 \alias{get_metrics}
 \title{Get Metrics for a Drug-Cell Line Pair}
 \usage{
-get_metrics(drug, cell_line, dose, viability)
+get_metrics(drug, cell_line, dose, inhibition)
 }
 \description{
 Wraps the analysis function for a single pair input.
