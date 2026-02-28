@@ -20,11 +20,8 @@ Pharmacogenomic datasets (such as GDSC, CTRP, and others) often show discordant 
 You can install `idrrR` directly from the source. Ensure you have the required dependencies:
 
 ```r
-# Install dependencies
-install.packages(c("data.table", "ggplot2", "drc", "minpack.lm", "caTools", "dplyr", "MESS"))
-
-# Install idrrR (assuming you are in the package parent directory)
-install.packages("idrrR", repos = NULL, type = "source")
+# Install idrrR
+devtools::install_github("kris-nader/idrrR")
 ```
 
 ---
@@ -122,8 +119,8 @@ To demonstrate, we can generate "perfect" data points from the consensus curve a
 # 1. Get Consensus Parameters for Paclitaxel x MCF7
 consensus <- plot_consensus_from_db("Paclitaxel", "MCF7")
 params <- consensus$metrics
-slope <- params$Slope
-ic50 <- params$IC50_absolute
+slope <- params$SLOPE
+ic50 <- params$IC50ABS
 max_resp <- params$Max_Response
 
 # 2. Generate "Perfect" Data Points (lying exactly on the curve)
