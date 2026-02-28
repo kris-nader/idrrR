@@ -9,9 +9,9 @@
 #' @param max_dose_range Optional max dose
 #'
 #' @importFrom drc drm LL.4 L.4 drmc
-#' @importFrom caTools runmean
+
 #' @importFrom minpack.lm nlsLM
-#' @importFrom MESS auc
+
 #' @import dplyr
 #' @export
 calculate_all <- function(dose, inhibition_percent, dataset, drug_name, DSS_type = 2,
@@ -138,7 +138,25 @@ calculate_all <- function(dose, inhibition_percent, dataset, drug_name, DSS_type
   max_lower <- ifelse(max_lower < 0, 0, max_lower)
   max_lower <- ifelse(max_lower > 100, 100, max_lower)
   # (Fix upper maximum for negative slopes)
-  run_avg <- caTools::runmean(mat_tbl$inhibition_percent, 10)
+  # Base R replacement for caTools::runmean
+  runmean_base <- function(x, k) {
+    # Implement a simple sliding window mean
+    n <- length(x)
+    if (n < k) {
+      return(mean(x, na.rm = TRUE))
+    }
+    res <- numeric(n)
+
+    # Fill ends with standard means or padding similar to caTools
+    half_k <- floor(k / 2)
+    for (i in seq_len(n)) {
+      start_i <- max(1, i - half_k)
+      end_i <- min(n, i + half_k)
+      res[i] <- mean(x[start_i:end_i], na.rm = TRUE)
+    }
+    return(res)
+  }
+  run_avg <- runmean_base(mat_tbl$inhibition_percent, 10)
   max_upper <- ifelse(any(run_avg[-nrow(mat_tbl)] > run_avg[nrow(mat_tbl)]), max(mat_tbl$inhibition_percent[run_avg > run_avg[nrow(mat_tbl)]]), coef_estim["MAX"])
   max_upper <- ifelse(any(mat_tbl$inhibition_percent > max_upper), mean(mat_tbl$inhibition_percent[mat_tbl$inhibition_percent > max_upper]) + 5, max_upper)
   max_upper <- ifelse(max_upper < 0, coef_estim["MAX"], max_upper)
@@ -248,7 +266,6 @@ calculate_all <- function(dose, inhibition_percent, dataset, drug_name, DSS_type
   x_range_max <- if (!is.null(max_dose_range)) log10(max_dose_range) else max(mat_tbl$logconc)
   x <- seq(x_range_min, x_range_max, length = 100)
   yic <- predict(nls_result_ic50, data.frame(logconc = x))
-  auc <- MESS::auc(x, yic)
 
 
   ####
