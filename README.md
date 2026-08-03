@@ -101,7 +101,13 @@ print(comparison$SEE_custom_vs_consensus)
 When benchmarking, the tool calculates the **Standard Error of Estimate (SEE)** to quantify how much your data deviates from the consensus model.
 
 **Formula:**
-$$ SEE = \sqrt{ \frac{\sum (y_{custom} - y_{consensus})^2}{n - p} } $$
+
+$$
+\mathrm{SEE} =
+\sqrt{\frac{\sum_{i=1}^{n}
+\left(y_{\mathrm{custom},i}-y_{\mathrm{consensus},i}\right)^2}{n-p}}
+$$
+
 Where:
 *   $y_{custom}$: Your observed inhibition values.
 *   $y_{consensus}$: Inhibition predicted by the consensus curve at your doses.
