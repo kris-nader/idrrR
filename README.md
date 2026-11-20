@@ -21,6 +21,7 @@ You can install `idrrR` directly from the source. Ensure you have the required d
 
 ```r
 # Install idrrR
+install.packages("devtools")
 devtools::install_github("kris-nader/idrrR")
 ```
 Typical install time: under a minute. A fresh install, including all dependencies from CRAN binaries, took about 25 seconds.
