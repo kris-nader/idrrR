@@ -1,7 +1,7 @@
 
 # idrrR: Integrated Drug Response Resource Tool
 
-`idrrR` is an R package designed to harmonize and analyze pharmacogenomic drug response data. It serves as the computational engine behind the **iDRR (Integrated Drug Response Resource)** project, enabling researchers to calculate robust consensus drug response curves and compare their own experimental data against a large-scale integrated database.
+`idrrR` is an R package designed to harmonize and analyze pharmacogenomic drug response data. It serves as the computational engine behind the **iDRR (Integrated Drug Response Resource)** project ([aittokallio.group/iDRR](https://aittokallio.group/iDRR)), enabling researchers to calculate robust consensus drug response curves and compare their own experimental data against a large-scale integrated database.
 
 ## About the Project
 
@@ -23,20 +23,21 @@ You can install `idrrR` directly from the source. Ensure you have the required d
 # Install idrrR
 devtools::install_github("kris-nader/idrrR")
 ```
+Typical install time: under a minute. A fresh install, including all dependencies from CRAN binaries, took about 25 seconds.
 
 ---
 
 ## Quick Start Guide
 
 ### 1. Load the Library
-Loading the library automatically initializes the consensus database (~70MB) for fast lookups.
+Loading the library automatically initializes the consensus database (~70MB) for fast lookups. idrrR downloads it automatically the first time it is needed and caches it. This might take some time depending on your connection but later sessions will load and read it from cache.
 
 ```r
 library(idrrR)
 ```
 
 ### 2. View Consensus Curves
-Query the database for any Drug-Cell Line pair to see the consensus fit.
+Query the database for any Drug-Cell Line pair to see the consensus fit. This should take around 5-7 seconds to display results. 
 
 ```r
 # Plot Paclitaxel response in MCF7 cells
@@ -56,7 +57,7 @@ print(result$metrics)
 You can analyze your own screening data using the `analyze_own_data` function.
 
 **Input Requirements:**
-*   **Columns:** `Drug_Name`, `Cell_Line`, `Dose` (µM), `Inhibition` (%).
+*   **Columns:** `Drug_Name`, `Cell_Line`, `Dose` (nM), `Inhibition` (%).
 *   **Scale:** `Inhibition` should be 0-100 (or 0-1 fraction, auto-detected).
     *   *Note: Convert Viability to Inhibition (100 - Viability) before analysis.*
 
@@ -147,3 +148,37 @@ res_skewed <- plot_custom_on_consensus("Paclitaxel", "MCF7", doses, skewed_inhib
 print(paste("SEE (Skewed):", round(res_skewed$SEE_custom_vs_consensus, 4)))
 # Output: SEE (Skewed): ~17.5 (Significant deviation)
 ```
+
+## System requirements
+
+### 1. Software
+
+| Requirement | Version tested |
+|---|---|
+| R | 4.5.1 |
+| data.table | 1.18.6.1 |
+| ggplot2 | 4.0.3 |
+| drc | 4.0.0 |
+| minpack.lm | 1.2.4 |
+| dplyr | 1.2.1 |
+| devtools (installation only) | 2.5.2 |
+
+idrrR needs R ≥ 4.0.0 and ggplot2 ≥ 3.4.0. The R packages are installed automatically with idrrR.
+
+### 2. Tested on
+
+| Operating system | R version |
+|---|---|
+| macOS 27.2.1 (Apple M3 Max, 48 GB RAM) | 4.5.1 |
+
+### 3. Hardware
+
+idrrR needs no non-standard hardware. It runs on a standard desktop or laptop with at least 4 GB of RAM (the database takes about 0.9 GB of memory once loaded) and about 100 MB of free disk space. An internet connection is needed once, to download the database.
+
+## License
+
+idrrR is released under the MIT License. See [LICENSE](LICENSE).
+
+## Getting help
+
+Report bugs or ask questions in [GitHub Issues](https://github.com/kris-nader/idrrR/issues) or by email at [kristen.nader@helsinki.fi](mailto:kristen.nader@helsinki.fi).
